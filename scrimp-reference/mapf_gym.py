@@ -773,12 +773,12 @@ class MAPFEnv(gym.Env):
             regions_dict[(x0, y0)] = visited
             return visited
 
-        prob = np.random.triangular(self.PROB[0], .33 * self.PROB[0] + .66 * self.PROB[1],
-                                    self.PROB[1])  # sample a value from triangular distribution
-        size = np.random.choice([self.SIZE[0], self.SIZE[0] * .5 + self.SIZE[1] * .5, self.SIZE[1]],
-                                p=[.5, .25, .25])  # sample a value according to the given probability
-        # prob = self.PROB
-        # size = self.SIZE  # fixed world0 size and obstacle density for evaluation
+        # prob = np.random.triangular(self.PROB[0], .33 * self.PROB[0] + .66 * self.PROB[1],
+        #                             self.PROB[1])  # sample a value from triangular distribution
+        # size = np.random.choice([self.SIZE[0], self.SIZE[0] * .5 + self.SIZE[1] * .5, self.SIZE[1]],
+        #                         p=[.5, .25, .25])  # sample a value according to the given probability
+        prob = self.PROB
+        size = self.SIZE  # fixed world0 size and obstacle density for evaluation
         world = -(np.random.rand(int(size), int(size)) < prob).astype(int)  # -1 obstacle,0 nothing, >0 agent id
 
         # randomize the position of agents
