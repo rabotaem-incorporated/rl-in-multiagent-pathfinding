@@ -1,0 +1,157 @@
+import sys
+import os
+
+sys.path.append(os.getcwd())
+from test_visualizer.animate import animate
+import DCC_reference.config as config
+from DCC_reference.model import Network
+from DCC_reference.environment import Environment
+import torch.multiprocessing as mp
+import torch
+import numpy as np
+import pickle
+import random
+
+torch.manual_seed(config.test_seed)
+np.random.seed(config.test_seed)
+random.seed(config.test_seed)
+DEVICE = torch.device("cpu")
+torch.set_num_threads(1)
+
+
+def create_single_test(map_size, num_agents, density):
+    name = f"./DCC_test/test_set/{map_size}size_{num_agents}agents_{density}density_1.pth"
+    env = Environment(fix_density=density, num_agents=num_agents, map_length=map_size)
+    map, agents_xy, targets_xy = (
+        np.copy(env.map),
+        np.copy(env.agents_pos),
+        np.copy(env.goals_pos),
+    )
+    with open(name, "wb") as f:
+        pickle.dump([(map, agents_xy, targets_xy)], f)
+
+    return name
+
+
+def create_multiple_tests(map_size, num_agents, density, n_cases):
+    name = f"./DCC_test/test_set/{map_size}size_{num_agents}agents_{density}density_{n_cases}.pth"
+    env = Environment(fix_density=density, num_agents=num_agents, map_length=map_size)
+    tests = []
+    for _ in range(n_cases):
+        tests.append(
+            (np.copy(env.map), np.copy(env.agents_pos), np.copy(env.goals_pos))
+        )
+        env.reset(num_agents=num_agents, map_length=map_size)
+    with open(name, "wb") as f:
+        pickle.dump(tests, f)
+
+    return name
+
+
+def run_single_test(test):
+    map, agents_xy, targets_xy, env, network = test
+    env.load(map, agents_xy, targets_xy)
+    network.reset()
+    obs, last_act, pos = env.observe()
+
+    done = False
+    step = 0
+    num_comm = 0
+    while not done and env.steps < config.max_episode_length:
+        actions, _, _, _, comm_mask = network.step(
+            torch.as_tensor(obs.astype(np.float32)).to(DEVICE),
+            torch.as_tensor(last_act.astype(np.float32)).to(DEVICE),
+            torch.as_tensor(pos.astype(int)),
+        )
+        (obs, last_act, pos), _, done, _ = env.step(actions)
+        step += 1
+        num_comm += np.sum(comm_mask)
+
+    return np.all(env.agents_pos == env.goals_pos), step, num_comm
+
+
+def run_multiple_tests(tests):
+    pool = mp.Pool(mp.cpu_count() // 2)
+    ret = pool.map(run_single_test, tests)
+
+    success, steps, num_comm = zip(*ret)
+
+    print("Success rate: {:.2f}%".format(sum(success) / len(success) * 100))
+    print("Average step: {}".format(sum(steps) / len(steps)))
+    print("Communication times: {}".format(sum(num_comm) / len(num_comm)))
+
+
+def run_tests_from_file(path, env, network):
+    print(f"Running tests from {path}")
+    with open(path, "rb") as f:
+        tests = pickle.load(f)
+    tests = [(*test, env, network) for test in tests]
+    if path.split("_")[-1] == "1.pth":
+        run_single_test_and_animate(tests[0], "./DCC_test/animations/animation.svg")
+    else:
+        run_multiple_tests(tests)
+
+
+def run_single_test_and_animate(test, save_path):
+    map, agents_xy, targets_xy, env, network = test
+    env.load(map, agents_xy, targets_xy)
+    network.reset()
+    obs, last_act, pos = env.observe()
+
+    done = False
+    step = 0
+    num_comm = 0
+    map = env.map
+    agents_xy = env.agents_pos
+    targets_xy = env.goals_pos
+    steps = []
+    prev_pos = env.agents_pos
+    while not done and env.steps < config.max_episode_length:
+        actions, _, _, _, comm_mask = network.step(
+            torch.as_tensor(obs.astype(np.float32)).to(DEVICE),
+            torch.as_tensor(last_act.astype(np.float32)).to(DEVICE),
+            torch.as_tensor(pos.astype(int)),
+        )
+        (obs, last_act, pos), _, done, _ = env.step(actions)
+        step += 1
+        num_comm += np.sum(comm_mask)
+        cur_pos = np.copy(env.agents_pos)
+        real_actions = np.zeros_like(actions)
+        delta = cur_pos - prev_pos
+        for i in range(len(actions)):
+            real_actions[i] = config.INV_ACTIONS[tuple(delta[i])]
+        prev_pos = cur_pos
+        steps.append(real_actions.tolist())
+
+    animate(
+        map,
+        agents_xy,
+        targets_xy,
+        np.array(steps),
+        save_path=save_path,
+    )
+    print(f"success: {np.all(env.agents_pos == env.goals_pos)}")
+    print(f"Step: {step}")
+    print(f"Communication times: {num_comm}")
+
+
+def prepare():
+    env = Environment()
+    network = Network()
+    network.eval()
+    network.to(DEVICE)
+    state_dict = torch.load(
+        os.path.join(config.save_path, "128000.pth"),
+        map_location=DEVICE,
+        weights_only=False,
+    )
+    network.load_state_dict(state_dict)
+    network.eval()
+
+    return env, network
+
+
+if __name__ == "__main__":
+    env, network = prepare()
+    path = create_multiple_tests(40, 32, 0.4, 100)
+    run_tests_from_file(path, env, network)

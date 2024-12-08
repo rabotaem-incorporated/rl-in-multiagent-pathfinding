@@ -27,7 +27,7 @@ gamma = 0.99
 batch_size = 128
 learning_starts = 50000
 target_network_update_freq = 1750
-save_path = './saved_models'
+save_path = './DCC_reference/saved_models'
 max_episode_length = 256
 buffer_capacity = 262144
 chunk_capacity = 64
@@ -65,7 +65,8 @@ cl_history_size = 100
 
 test_seed = 0
 num_test_cases = 200
-ACTION_LIST = np.array([[-1, 0], [1, 0], [0, -1], [0, 1], [0, 0]], dtype=int)
+ACTIONS = np.array([[-1, 0], [1, 0], [0, -1], [0, 1], [0, 0]], dtype=int)
+INV_ACTIONS = dict(zip(map(tuple, ACTIONS), range(len(ACTIONS))))
 test_env_settings = (
     (40, 4, 0.3),
     # (40, 8, 0.3),

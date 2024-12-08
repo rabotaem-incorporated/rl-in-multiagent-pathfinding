@@ -146,7 +146,7 @@ class GlobalBuffer:
             for global_idx, local_idx in zip(global_idxes.tolist(), local_idxes.tolist()):
 
                 assert local_idx < self.size_buf[global_idx], 'index is {} but size is {}, p {}'.format(
-                    local_idx, self.size_buf[global_idx], self.priority_tree[idx])
+                    local_idx, self.size_buf[global_idx], self.priority_tree[global_idx])
 
                 steps = min(config.forward_steps,
                             self.size_buf[global_idx].item()-local_idx)

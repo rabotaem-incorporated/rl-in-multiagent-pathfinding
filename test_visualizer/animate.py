@@ -9,8 +9,8 @@ def animate(
     agents_xy: np.ndarray,
     targets_xy: np.ndarray,
     steps: np.ndarray,
-    path: str = "./test-visualizer/animation.svg",
-    moves: np.ndarray = np.array([[-1, 0], [1, 0], [0, -1], [0, 1], [0, 0]]),
+    save_path: str = "./test-visualizer/animation.svg",
+    actions: np.ndarray = np.array([[-1, 0], [1, 0], [0, -1], [0, 1], [0, 0]]),
 ) -> None:
     num_agents = agents_xy.shape[0]
     config = GridConfig(
@@ -21,11 +21,11 @@ def animate(
         agents_xy=agents_xy.tolist(),
         targets_xy=targets_xy.tolist(),
     )
-    config.MOVES = moves.tolist()
+    config.MOVES = actions.tolist()
     env = pogema_v0(grid_config=config)
     monitor = AnimationMonitor(env)
     monitor.reset()
     for step in steps:
         monitor.step(step)
-    monitor.save_animation(path)
+    monitor.save_animation(save_path)
 

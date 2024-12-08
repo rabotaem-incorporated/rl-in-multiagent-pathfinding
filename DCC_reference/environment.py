@@ -1,9 +1,7 @@
 import random
 from typing import List, Union
 import numpy as np
-import config as config
-
-ACTION_LIST = config.ACTION_LIST
+import  DCC_reference.config as config
 
 class Environment:
     def __init__(
@@ -322,7 +320,7 @@ class Environment:
                 checking_list.remove(agent_id)
             else:
                 # move
-                next_pos[agent_id] += ACTION_LIST[actions[agent_id]]
+                next_pos[agent_id] += config.ACTIONS[actions[agent_id]]
                 rewards.append(self.reward_fn["move"])
 
         # first round check, these two conflicts have the highest priority
