@@ -341,10 +341,10 @@ if __name__ == "__main__":
     if Path("scrimp.pth").exists():
         agents.load("scrimp.pth")
 
-    for i in tqdm.tqdm(range(100)):
+    for i in tqdm.tqdm(range(100000)):
         agents.train_imitation_epoch()
-
-    agents.save("scrimp.pth")
+        if (i + 1) % 100 == 0:
+            agents.save("scrimp.pth")
 
     while True:
         agents.reset(env.num_agents)
