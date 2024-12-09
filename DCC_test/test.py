@@ -32,6 +32,14 @@ def create_single_test(map_x, map_y, num_agents, density):
 
     return name
 
+def create_single_test_from_map(map, agents_xy, targets_xy):
+    map_x, map_y = map.shape
+    num_agents = agents_xy.shape[0]
+    name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_from_map_1.pth"
+    with open(name, "wb") as f:
+        pickle.dump([(map, agents_xy, targets_xy)], f)
+
+    return name
 
 def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
     name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_{n_cases}.pth"
@@ -152,5 +160,5 @@ def prepare():
 
 if __name__ == "__main__":
     network = prepare()
-    path = create_single_test(40, 40, 32, 0.3)
+    path = create_single_test_from_map(np.array([[0, 0], [1, 0]]), np.array([(0, 0)]), np.array([(1, 1)]))
     run_tests_from_file(path, network)

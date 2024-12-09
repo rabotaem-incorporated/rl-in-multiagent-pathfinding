@@ -56,9 +56,9 @@ class Environment:
             for i, agents in enumerate(agent_idx_per_partition):
                 sz = 2 * len(agents)
                 coords = [partitions[i][j] for j in np.random.choice(range(len(partitions[i])), sz, replace=False)]
-                for agent in agents:
-                    self.agents_pos[agent] = np.asarray(coords[2 * agent], dtype=int)
-                    self.goals_pos[agent] = np.asarray(coords[2 * agent + 1], dtype=int)
+                for i, agent in enumerate(agents):
+                    self.agents_pos[agent] = np.asarray(coords[2 * i], dtype=int)
+                    self.goals_pos[agent] = np.asarray(coords[2 * i + 1], dtype=int)
 
         self.obs_radius = obs_radius
         self.reward_fn = reward_fn
