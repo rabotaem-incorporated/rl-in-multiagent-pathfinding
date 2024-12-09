@@ -14,10 +14,9 @@ import dataclasses
 
 from model import ScrimpNet
 from params import *
-from environment import Environment
-from scrimp.environment import EnvironmentParams
-from scrimp.model import ScrimpNetOutputs
-from scrimp.od_mstar3.col_set_addition import NoSolutionError
+from environment import Environment, EnvironmentParams
+from model import ScrimpNetOutputs
+from od_mstar3.col_set_addition import NoSolutionError
 
 
 @dataclasses.dataclass
@@ -43,6 +42,7 @@ class Agents:
         self.episodic_buffer_ptrs = None
         self.optim = torch.optim.Adam(self.model.parameters(), lr=HP.lr)
         self.experience_buffer = []
+        self.action_cache = None
 
     def reset(self, num_agents):
         self.num_agents = num_agents
@@ -243,6 +243,7 @@ class Agents:
                 rewards[i] += HP.action_reward
 
         resulting_env = copy.deepcopy(env)
+        self.action_cache = action
         blocking_rewards = resulting_env.commit(action)
 
         intrinsic_rewards = torch.zeros(num_agents, device=DEV)
@@ -329,26 +330,44 @@ class Agents:
         loss.backward()
         self.optim.step()
 
+    def pathfind(self, env: Environment, step_limit: int = 10 ** 9):
+        self.reset(env.num_agents)
+        actions = []
+        for i in range(1, step_limit):
+            env = self.act(env)
+            actions.append(self.action_cache)
+            if env.is_solved():
+                return actions, True
+        return actions, False
+
 
 if __name__ == "__main__":
-    env = Environment.generate(EnvironmentParams(
-        size=10,
-        num_agents=8,
-        obstacle_prob=0.2,
-    ))
-
     agents = Agents()
     if Path("scrimp.pth").exists():
         agents.load("scrimp.pth")
 
-    for i in tqdm.tqdm(range(100000)):
+    for i in tqdm.tqdm(range(0)):
         agents.train_imitation_epoch()
         if (i + 1) % 100 == 0:
             agents.save("scrimp.pth")
 
+    # env = Environment.generate(EnvironmentParams(
+    #     size=10,
+    #     num_agents=8,
+    #     obstacle_prob=0.2,
+    # ))
+    env = Environment(np.array([
+        [0, 0, 0, 1, 0],
+        [0, 1, 0, 1, 0],
+        [0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0],
+        [0, 1, 0, 0, 0],
+    ]), [(0, 4), (0, 0), (2, 2)], [(4, 0), (4, 4), (2, 2)])
+
     while True:
         agents.reset(env.num_agents)
         env = agents.act(env)
-
         print(env)
         time.sleep(0.5)
+
+    # actions, success = agents.pathfind(env, step_limit=10)
