@@ -24,10 +24,7 @@ class Environment:
             self.agents_pos = np.copy(agents_pos)
             self.goals_pos = np.copy(goals_pos)
             self.num_agents = agents_pos.shape[0]
-            self.map_size = (self.map.shape[0], self.map.shape[1])
-            self.get_heuri_map()
-            self.steps = 0
-            self.last_actions = np.zeros((self.num_agents, 5), dtype=bool)
+            self.map_size = (map.shape[0], map.shape[1])
         else:
             if random:
                 self.num_agents, self.map_size = np.random.choice(config.maps)
@@ -59,16 +56,15 @@ class Environment:
             for i, agents in enumerate(agent_idx_per_partition):
                 sz = 2 * len(agents)
                 coords = [partitions[i][j] for j in np.random.choice(range(len(partitions[i])), sz, replace=False)]
-                print(coords)
                 for agent in agents:
                     self.agents_pos[agent] = np.asarray(coords[2 * agent], dtype=int)
                     self.goals_pos[agent] = np.asarray(coords[2 * agent + 1], dtype=int)
 
-            self.obs_radius = obs_radius
-            self.reward_fn = reward_fn
-            self.get_heuri_map()
-            self.steps = 0
-            self.last_actions = np.zeros((self.num_agents, 5), dtype=bool)
+        self.obs_radius = obs_radius
+        self.reward_fn = reward_fn
+        self.get_heuri_map()
+        self.steps = 0
+        self.last_actions = np.zeros((self.num_agents, 5), dtype=bool)
 
     def dfs(self, i, j, visited, partition):
         if (
@@ -181,16 +177,16 @@ class Environment:
         reward = [None for _ in range(self.num_agents)]
         next_pos = np.copy(self.agents_pos)
         undecided = set(range(self.num_agents))
-        for i in undecided:
+        for i in list(undecided):
             if actions[i] == 4:
                 if np.array_equal(self.agents_pos[i], self.goals_pos[i]):
-                    rewards[i] = self.reward_fn["stay_on_goal"]
+                    reward[i] = self.reward_fn["stay_on_goal"]
                 else:
-                    rewards[i] = self.reward_fn["stay_off_goal"]
+                    reward[i] = self.reward_fn["stay_off_goal"]
                 undecided.remove(i)
             else:
                 next_pos[i] += config.ACTIONS[actions[i]]
-                rewards[i] = self.reward_fn["move"]
+                reward[i] = self.reward_fn["move"]
         
         for i in range(self.num_agents):
             if np.any(next_pos[i] < 0) or \
@@ -239,7 +235,7 @@ class Environment:
 
         if np.array_equal(self.agents_pos, self.goals_pos):
             done = True
-            rewards = [self.reward_fn["finish"] for _ in range(self.num_agents)]
+            reward = [self.reward_fn["finish"] for _ in range(self.num_agents)]
         else:
             done = False
 
@@ -248,6 +244,6 @@ class Environment:
         self.last_actions = np.zeros((self.num_agents, 5), dtype=bool)
         self.last_actions[np.arange(self.num_agents), np.array(actions)] = 1
 
-        return self.observe(), rewards, done, info
+        return self.observe(), reward, done, info
 
 
