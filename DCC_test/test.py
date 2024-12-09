@@ -3,9 +3,9 @@ import os
 
 sys.path.append(os.getcwd())
 from test_visualizer.animate import animate
-import DCC_reference.config as config
-from DCC_reference.model import Network
-from DCC_reference.environment import Environment
+import DCC_implementation.config as config
+from DCC_implementation.model import Network
+from DCC_implementation.environment import Environment
 import torch.multiprocessing as mp
 import torch
 import numpy as np
@@ -19,9 +19,9 @@ DEVICE = torch.device("cpu")
 torch.set_num_threads(1)
 
 
-def create_single_test(map_size, num_agents, density):
-    name = f"./DCC_test/test_set/{map_size}size_{num_agents}agents_{density}density_1.pth"
-    env = Environment(fix_density=density, num_agents=num_agents, map_length=map_size)
+def create_single_test(map_x, map_y, num_agents, density):
+    name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_1.pth"
+    env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
     map, agents_xy, targets_xy = (
         np.copy(env.map),
         np.copy(env.agents_pos),
@@ -33,15 +33,15 @@ def create_single_test(map_size, num_agents, density):
     return name
 
 
-def create_multiple_tests(map_size, num_agents, density, n_cases):
-    name = f"./DCC_test/test_set/{map_size}size_{num_agents}agents_{density}density_{n_cases}.pth"
-    env = Environment(fix_density=density, num_agents=num_agents, map_length=map_size)
+def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
+    name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_{n_cases}.pth"
+    env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
     tests = []
     for _ in range(n_cases):
         tests.append(
             (np.copy(env.map), np.copy(env.agents_pos), np.copy(env.goals_pos))
         )
-        env.reset(num_agents=num_agents, map_length=map_size)
+        env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
     with open(name, "wb") as f:
         pickle.dump(tests, f)
 
@@ -49,8 +49,8 @@ def create_multiple_tests(map_size, num_agents, density, n_cases):
 
 
 def run_single_test(test):
-    map, agents_xy, targets_xy, env, network = test
-    env.load(map, agents_xy, targets_xy)
+    map, agents_xy, targets_xy, network = test
+    env = Environment(from_map=True, map=map, agents_pos=agents_xy, goals_pos=targets_xy)
     network.reset()
     obs, last_act, pos = env.observe()
 
@@ -81,11 +81,11 @@ def run_multiple_tests(tests):
     print("Communication times: {}".format(sum(num_comm) / len(num_comm)))
 
 
-def run_tests_from_file(path, env, network):
+def run_tests_from_file(path, network):
     print(f"Running tests from {path}")
     with open(path, "rb") as f:
         tests = pickle.load(f)
-    tests = [(*test, env, network) for test in tests]
+    tests = [(*test, network) for test in tests]
     if path.split("_")[-1] == "1.pth":
         run_single_test_and_animate(tests[0], "./DCC_test/animations/animation.svg")
     else:
@@ -93,8 +93,8 @@ def run_tests_from_file(path, env, network):
 
 
 def run_single_test_and_animate(test, save_path):
-    map, agents_xy, targets_xy, env, network = test
-    env.load(map, agents_xy, targets_xy)
+    map, agents_xy, targets_xy, network = test
+    env = Environment(from_map=True, map=map, agents_pos=agents_xy, goals_pos=targets_xy)
     network.reset()
     obs, last_act, pos = env.observe()
 
@@ -136,7 +136,6 @@ def run_single_test_and_animate(test, save_path):
 
 
 def prepare():
-    env = Environment()
     network = Network()
     network.eval()
     network.to(DEVICE)
@@ -148,10 +147,10 @@ def prepare():
     network.load_state_dict(state_dict)
     network.eval()
 
-    return env, network
+    return network
 
 
 if __name__ == "__main__":
-    env, network = prepare()
-    path = create_multiple_tests(40, 32, 0.4, 100)
-    run_tests_from_file(path, env, network)
+    network = prepare()
+    path = create_single_test(40, 40, 32, 0.3)
+    run_tests_from_file(path, network)
