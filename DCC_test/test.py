@@ -43,13 +43,13 @@ def create_single_test_from_map(map, agents_xy, targets_xy):
 
 def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
     name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_{n_cases}.pth"
-    env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
     tests = []
-    for _ in range(n_cases):
+    for i in range(n_cases):
+        print(name, i)
+        env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
         tests.append(
             (np.copy(env.map), np.copy(env.agents_pos), np.copy(env.goals_pos))
         )
-        env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
     with open(name, "wb") as f:
         pickle.dump(tests, f)
 
@@ -159,6 +159,7 @@ def prepare():
 
 
 if __name__ == "__main__":
-    network = prepare()
-    path = create_single_test_from_map(np.array([[0, 0], [1, 0]]), np.array([(0, 0)]), np.array([(1, 1)]))
-    run_tests_from_file(path, network)
+    for agents in (16, 32, 64, 128):
+        for map_size in (32, 64, 128):
+            for density in (0.2, 0.3, 0.4):
+                create_multiple_tests(map_size, map_size, agents, density, 30)

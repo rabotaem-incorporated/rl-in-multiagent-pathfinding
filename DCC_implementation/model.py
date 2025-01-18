@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.amp import autocast
-import DCC_reference.config as config
+import DCC_implementation.config as config
 
 
 class CommLayer(nn.Module):

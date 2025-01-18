@@ -1,8 +1,10 @@
 import random
 from typing import List, Union, Tuple
 import numpy as np
-import DCC_implementation.config as config
 import scipy.stats as ss
+import DCC_implementation.config as config
+import sys
+sys.setrecursionlimit(1000000)
 
 
 class Environment:
@@ -12,7 +14,6 @@ class Environment:
         map_size: Tuple[int, int] = config.init_map_size,
         obstacle_density: float = 0.3,
         obs_radius: int = config.obs_radius,
-        reward_fn: dict = config.reward_fn,
         random=False,
         from_map=False,
         map: np.ndarray = None,
@@ -34,9 +35,15 @@ class Environment:
                 self.num_agents = num_agents
                 self.obstacle_density = obstacle_density
             partitions = []
-            while len(partitions) == 0 or sum([len(partition) // 2 for partition in partitions]) < self.num_agents:
+            while (
+                len(partitions) == 0
+                or sum([len(partition) // 2 for partition in partitions])
+                < self.num_agents
+            ):
                 self.map = (
-                    ss.bernoulli(self.obstacle_density).rvs(size=self.map_size).astype(int)
+                    ss.bernoulli(self.obstacle_density)
+                    .rvs(size=self.map_size)
+                    .astype(int)
                 )
                 partitions = self.map_partition()
             self.agents_pos = np.empty((self.num_agents, 2), dtype=int)
@@ -55,39 +62,46 @@ class Environment:
             ]
             for i, agents in enumerate(agent_idx_per_partition):
                 sz = 2 * len(agents)
-                coords = [partitions[i][j] for j in np.random.choice(range(len(partitions[i])), sz, replace=False)]
+                coords = [
+                    partitions[i][j]
+                    for j in np.random.choice(
+                        range(len(partitions[i])), sz, replace=False
+                    )
+                ]
                 for i, agent in enumerate(agents):
                     self.agents_pos[agent] = np.asarray(coords[2 * i], dtype=int)
                     self.goals_pos[agent] = np.asarray(coords[2 * i + 1], dtype=int)
 
         self.obs_radius = obs_radius
-        self.reward_fn = reward_fn
         self.get_heuri_map()
         self.steps = 0
         self.last_actions = np.zeros((self.num_agents, 5), dtype=bool)
 
-    def dfs(self, i, j, visited, partition):
-        if (
-            i < 0
-            or j < 0
-            or i >= self.map_size[0]
-            or j >= self.map_size[1]
-            or visited[i, j]
-        ):
-            return
-        partition.append((i, j))
-        visited[i, j] = True
-        for action in config.ACTIONS[:-1]:
-            self.dfs(i + action[0], j + action[1], visited, partition)
+    def dfs(self, i, j, partition):
+        q = [(i, j)]
+        while q:
+            i, j = q.pop()
+            partition.append((i, j))
+            self.visited[i, j] = True
+            for action in config.ACTIONS[:-1]:
+                new_i, new_j = i + action[0], j + action[1]
+                if not (
+                    new_i < 0
+                    or new_j < 0
+                    or new_i >= self.map_size[0]
+                    or new_j >= self.map_size[1]
+                    or self.visited[new_i, new_j]
+                ):
+                    q.append((new_i, new_j))
 
     def map_partition(self):
         partitions = []
-        visited = self.map == 1
+        self.visited = self.map == 1
         for i in range(self.map_size[0]):
             for j in range(self.map_size[1]):
-                if not visited[i, j]:
+                if not self.visited[i, j]:
                     new_partition = []
-                    self.dfs(i, j, visited, new_partition)
+                    self.dfs(i, j, new_partition)
                     partitions.append(new_partition)
 
         return partitions
@@ -148,7 +162,7 @@ class Environment:
                 (self.obs_radius, self.obs_radius),
             ),
         )
-        
+
     def observe(self):
         # returns obs, last_actions, agents_pos
         # 1 - agents, 2 - obstacles, 3-6 - heuri
@@ -187,11 +201,13 @@ class Environment:
             else:
                 next_pos[i] += config.ACTIONS[actions[i]]
                 reward[i] = self.reward_fn["move"]
-        
+
         for i in range(self.num_agents):
-            if np.any(next_pos[i] < 0) or \
-                next_pos[i][0] >= self.map_size[0] or \
-                next_pos[i][1] >= self.map_size[1]:
+            if (
+                np.any(next_pos[i] < 0)
+                or next_pos[i][0] >= self.map_size[0]
+                or next_pos[i][1] >= self.map_size[1]
+            ):
                 reward[i] = self.reward_fn["collision"]
                 next_pos[i] = self.agents_pos[i]
                 undecided.remove(i)
@@ -200,11 +216,12 @@ class Environment:
                 next_pos[i] = self.agents_pos[i]
                 undecided.remove(i)
 
-        
         for i in range(self.num_agents):
             for j in range(i + 1, self.num_agents):
                 if i in undecided and j in undecided:
-                    if np.all(self.agents_pos[i] == next_pos[j]) and np.all(self.agents_pos[j] == next_pos[i]):
+                    if np.all(self.agents_pos[i] == next_pos[j]) and np.all(
+                        self.agents_pos[j] == next_pos[i]
+                    ):
                         reward[i] = self.reward_fn["collision"]
                         reward[j] = self.reward_fn["collision"]
                         next_pos[i] = self.agents_pos[i]
@@ -212,24 +229,31 @@ class Environment:
                         undecided.remove(i)
                         undecided.remove(j)
 
-        
         no_conflict = False
         while not no_conflict:
             no_conflict = True
-            distinct_next_pos = set([tuple(pos) for i, pos in enumerate(next_pos) if i in undecided])
+            distinct_next_pos = set(
+                [tuple(pos) for i, pos in enumerate(next_pos) if i in undecided]
+            )
             for pos in distinct_next_pos:
-                conflict = [(self.agents_pos[i], i) for i in range(self.num_agents) if np.all(next_pos[i] == pos)]
+                conflict = [
+                    (self.agents_pos[i], i)
+                    for i in range(self.num_agents)
+                    if np.all(next_pos[i] == pos)
+                ]
                 all_undecided = np.all([i in undecided for _, i in conflict])
-                if (len(conflict) > 1):
+                if len(conflict) > 1:
                     if all_undecided:
-                        conflict.sort(key = lambda x: x[0][0] * self.map_size[1] + x[0][1])
+                        conflict.sort(
+                            key=lambda x: x[0][0] * self.map_size[1] + x[0][1]
+                        )
                         conflict = conflict[1:]
                     no_conflict = False
                     for _, i in conflict:
                         reward[i] = self.reward_fn["collision"]
                         next_pos[i] = self.agents_pos[i]
                         undecided.remove(i)
-                    
+
         self.agents_pos = np.copy(next_pos)
         self.steps += 1
 
@@ -245,5 +269,3 @@ class Environment:
         self.last_actions[np.arange(self.num_agents), np.array(actions)] = 1
 
         return self.observe(), reward, done, info
-
-
