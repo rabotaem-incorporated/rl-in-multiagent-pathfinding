@@ -23,7 +23,7 @@ def create_single_test(map_x, map_y, num_agents, density):
     name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_1.pth"
     env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
     map, agents_xy, targets_xy = (
-        np.copy(env.map),
+        np.copy(env.mp),
         np.copy(env.agents_pos),
         np.copy(env.goals_pos),
     )
@@ -48,7 +48,7 @@ def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
         print(name, i)
         env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
         tests.append(
-            (np.copy(env.map), np.copy(env.agents_pos), np.copy(env.goals_pos))
+            (np.copy(env.mp), np.copy(env.agents_pos), np.copy(env.goals_pos))
         )
     with open(name, "wb") as f:
         pickle.dump(tests, f)
@@ -57,8 +57,8 @@ def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
 
 
 def run_single_test(test):
-    map, agents_xy, targets_xy, network = test
-    env = Environment(from_map=True, map=map, agents_pos=agents_xy, goals_pos=targets_xy)
+    mp, agents_xy, targets_xy, network = test
+    env = Environment(from_map=True, mp=mp, agents_pos=agents_xy, goals_pos=targets_xy)
     network.reset()
     obs, last_act, pos = env.observe()
 
@@ -87,6 +87,8 @@ def run_multiple_tests(tests):
     print("Success rate: {:.2f}%".format(sum(success) / len(success) * 100))
     print("Average step: {}".format(sum(steps) / len(steps)))
     print("Communication times: {}".format(sum(num_comm) / len(num_comm)))
+    
+    return success, steps, num_comm
 
 
 def run_tests_from_file(path, network):
@@ -109,7 +111,7 @@ def run_single_test_and_animate(test, save_path):
     done = False
     step = 0
     num_comm = 0
-    map = env.map
+    map = env.mp
     agents_xy = env.agents_pos
     targets_xy = env.goals_pos
     steps = []
@@ -159,7 +161,13 @@ def prepare():
 
 
 if __name__ == "__main__":
-    for agents in (16, 32, 64, 128):
-        for map_size in (32, 64, 128):
-            for density in (0.2, 0.3, 0.4):
-                create_multiple_tests(map_size, map_size, agents, density, 30)
+    network = prepare()
+    for filename in os.listdir("./DCC_test/test_set"):
+        if filename.endswith("30.pth"):
+            results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network)
+            pickle.dump(results, open(f"./DCC_test/results_v2/{filename}", "wb"))
+    # for map_size in (32, 64, 96):
+    #     for agents in (16, 32, 64, 96):
+    #         for density in (0.2, 0.3, 0.4):
+    #             create_multiple_tests(map_size, map_size, agents, density, 30)
+                
