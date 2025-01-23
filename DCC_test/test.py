@@ -22,22 +22,22 @@ torch.set_num_threads(1)
 def create_single_test(map_x, map_y, num_agents, density):
     name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_1.pth"
     env = Environment(obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y))
-    map, agents_xy, targets_xy = (
+    mp, agents_xy, targets_xy = (
         np.copy(env.mp),
         np.copy(env.agents_pos),
         np.copy(env.goals_pos),
     )
     with open(name, "wb") as f:
-        pickle.dump([(map, agents_xy, targets_xy)], f)
+        pickle.dump([(mp, agents_xy, targets_xy)], f)
 
     return name
 
-def create_single_test_from_map(map, agents_xy, targets_xy):
-    map_x, map_y = map.shape
+def create_single_test_from_map(mp, agents_xy, targets_xy):
+    map_x, map_y = mp.shape
     num_agents = agents_xy.shape[0]
     name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_from_map_1.pth"
     with open(name, "wb") as f:
-        pickle.dump([(map, agents_xy, targets_xy)], f)
+        pickle.dump([(mp, agents_xy, targets_xy)], f)
 
     return name
 
@@ -65,6 +65,8 @@ def run_single_test(test):
     done = False
     step = 0
     num_comm = 0
+    hist = []
+    comm_hist = []
     while not done and env.steps < config.max_episode_length:
         actions, _, _, _, comm_mask = network.step(
             torch.as_tensor(obs.astype(np.float32)).to(DEVICE),
@@ -73,22 +75,24 @@ def run_single_test(test):
         )
         (obs, last_act, pos), _, done, _ = env.step(actions)
         step += 1
+        hist.append(env.agents_pos)
+        comm_hist.append(comm_mask)
         num_comm += np.sum(comm_mask)
 
-    return np.all(env.agents_pos == env.goals_pos), step, num_comm
+    return np.all(env.agents_pos == env.goals_pos), step, num_comm, hist, comm_hist
 
 
 def run_multiple_tests(tests):
     pool = mp.Pool(mp.cpu_count() // 2)
     ret = pool.map(run_single_test, tests)
 
-    success, steps, num_comm = zip(*ret)
+    success, steps, num_comm, hist, comm_hist = zip(*ret)
 
     print("Success rate: {:.2f}%".format(sum(success) / len(success) * 100))
     print("Average step: {}".format(sum(steps) / len(steps)))
     print("Communication times: {}".format(sum(num_comm) / len(num_comm)))
     
-    return success, steps, num_comm
+    return success, steps, num_comm, hist, comm_hist
 
 
 def run_tests_from_file(path, network):
@@ -97,21 +101,20 @@ def run_tests_from_file(path, network):
         tests = pickle.load(f)
     tests = [(*test, network) for test in tests]
     if path.split("_")[-1] == "1.pth":
-        run_single_test_and_animate(tests[0], "./DCC_test/animations/animation.svg")
-    else:
-        run_multiple_tests(tests)
+        return run_single_test_and_animate(tests[0], "./DCC_test/animations/animation.svg")
+    return run_multiple_tests(tests)
 
 
 def run_single_test_and_animate(test, save_path):
-    map, agents_xy, targets_xy, network = test
-    env = Environment(from_map=True, map=map, agents_pos=agents_xy, goals_pos=targets_xy)
+    mp, agents_xy, targets_xy, network = test
+    env = Environment(from_map=True, mp=mp, agents_pos=agents_xy, goals_pos=targets_xy)
     network.reset()
     obs, last_act, pos = env.observe()
 
     done = False
     step = 0
     num_comm = 0
-    map = env.mp
+    mp = env.mp
     agents_xy = env.agents_pos
     targets_xy = env.goals_pos
     steps = []
@@ -134,7 +137,7 @@ def run_single_test_and_animate(test, save_path):
         steps.append(real_actions.tolist())
 
     animate(
-        map,
+        mp,
         agents_xy,
         targets_xy,
         np.array(steps),
@@ -143,7 +146,7 @@ def run_single_test_and_animate(test, save_path):
     print(f"success: {np.all(env.agents_pos == env.goals_pos)}")
     print(f"Step: {step}")
     print(f"Communication times: {num_comm}")
-
+    return np.all(env.agents_pos == env.goals_pos), step, num_comm,
 
 def prepare():
     network = Network()
@@ -162,10 +165,11 @@ def prepare():
 
 if __name__ == "__main__":
     network = prepare()
-    for filename in os.listdir("./DCC_test/test_set"):
-        if filename.endswith("30.pth"):
-            results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network)
-            pickle.dump(results, open(f"./DCC_test/results_v2/{filename}", "wb"))
+    res = run_tests_from_file('/home/justermak/study/rl-in-multiagent-pathfinding/DCC_test/test_set/32x32size_32agents_0.3density_30.pth', network)
+    # for filename in os.listdir("./DCC_test/test_set"):
+    #     if filename.endswith("30.pth"):
+    #         results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network)
+    #         pickle.dump(results, open(f"./DCC_test/results_v2/{filename}", "wb"))
     # for map_size in (32, 64, 96):
     #     for agents in (16, 32, 64, 96):
     #         for density in (0.2, 0.3, 0.4):

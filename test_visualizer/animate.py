@@ -5,7 +5,7 @@ import numpy as np
 
 
 def animate(
-    map: np.ndarray,
+    mp: np.ndarray,
     agents_xy: np.ndarray,
     targets_xy: np.ndarray,
     steps: np.ndarray,
@@ -15,8 +15,8 @@ def animate(
     num_agents = agents_xy.shape[0]
     config = GridConfig(
         on_target='nothing',
-        size=map.shape[0],
-        map=map.tolist(),
+        size=max(mp.shape[0], mp.shape[1]),
+        map=mp.tolist(),
         num_agents=num_agents,
         agents_xy=agents_xy.tolist(),
         targets_xy=targets_xy.tolist(),
