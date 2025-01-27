@@ -11,13 +11,8 @@ import tqdm
 import dataclasses
 from pathlib import Path
 import numpy as np
-
-DATA_DIRECTORY = Path("DCC_test")
-RUN_NAME = "32x32size_96agents_0.2density_30.pth"
-RUN_ID = 0
-
-TEST_DIRECTORY = DATA_DIRECTORY / "test_set"
-RESULT_DIRECTORY = DATA_DIRECTORY / "results_v2"
+import sys
+import argparse
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,9 +27,9 @@ class Run:
     map_height: int
 
 
-def load_run(name: str, run_id: int) -> Run:
-    with open(TEST_DIRECTORY / RUN_NAME, "rb") as f:
-        map_, starts, goals = pickle.load(f)[RUN_ID]
+def load_run(map_path, result_path, run_id: int) -> Run:
+    with open(map_path, "rb") as f:
+        map_, starts, goals = pickle.load(f)[run_id]
         num_agents = len(starts)
         assert starts.shape == (num_agents, 2)
         assert goals.shape == (num_agents, 2)
@@ -43,10 +38,10 @@ def load_run(name: str, run_id: int) -> Run:
         map_ = np.array(map_, dtype=np.bool_)
         starts = np.array(starts, dtype=np.int32)
         goals = np.array(goals, dtype=np.int32)
-    with open(RESULT_DIRECTORY / RUN_NAME, "rb") as f:
+    with open(result_path, "rb") as f:
         data = pickle.load(f)
-        positions = np.array(data[3][RUN_ID], dtype=np.int32)
-        attentions = np.array(data[4][RUN_ID], dtype=np.float32)
+        positions = np.array(data[3][run_id], dtype=np.int32)
+        attentions = np.array(data[4][run_id], dtype=np.float32)
         num_steps = len(positions)
         assert positions.shape == (num_steps, num_agents, 2)
         assert attentions.shape == (num_steps, num_agents, num_agents)
@@ -56,9 +51,6 @@ def load_run(name: str, run_id: int) -> Run:
     positions = np.concatenate([starts[None], positions], axis=0)
     attentions = np.concatenate([np.zeros((1, num_agents, num_agents)), attentions], axis=0)
     return Run(map_, starts, goals, positions, attentions, num_agents, map_width, map_height)
-
-
-run = load_run(RUN_NAME, RUN_ID)
 
 
 @dataclasses.dataclass
@@ -158,11 +150,19 @@ class RunWidget(Widget):
             attention = attention2
         attention = ((attention + attention.T) / 2) ** 0.1
         for i in range(self.run.num_agents):
+            color = cv2.cvtColor(np.uint8([[[256 / self.run.num_agents * i, 255, 255]]]), cv2.COLOR_HSV2RGB)[0, 0]
             draw.circle(
-                rc.screen,
-                cv2.cvtColor(np.uint8([[[256 / self.run.num_agents * i, 255, 255]]]), cv2.COLOR_HSV2RGB)[0, 0],
+                rc.screen, color,
                 pos[i][[1, 0]] * tile_size + tile_size // 2 + rc.offset + (rc.size - self.minsize) / 2 + 0.5,
                 tile_size // 3,
+            )
+            draw.rect(
+                rc.screen, color,
+                Rect(
+                    goal[i][[1, 0]] * tile_size + tile_size / 6 + rc.offset + (rc.size - self.minsize) / 2 + 0.5,
+                    (tile_size / 3 * 2, tile_size / 3 * 2),
+                ),
+                3,
             )
             for j in range(i):
                 a = attention[i, j]
@@ -317,6 +317,7 @@ class SliderWidget(Widget):
     def draw(self, rc: RenderingContext) -> None:
         rect = Rect(rc.offset, rc.size)
         self.rect = rect
+        self.value = np.clip(self.value, self.min, self.max)
         rc.add_hitbox(rect, self)
         draw.rect(rc.screen, "black", rect)
         draw.rect(
@@ -382,7 +383,6 @@ def make_video(run, filepath: Path, duration: float, fps: int) -> None:
         video.release()
 
 
-
 def application(run: Run):
     time = 0.0
     running = True
@@ -394,7 +394,7 @@ def application(run: Run):
             GridWidget(
                 [run_widget := RunWidget(run)],
                 [ButtonWidget("Pause/Unpause", lambda:  setattr(run_widget, "paused", not run_widget.paused))],
-                [time_slider := SliderWidget(0, len(run.positions), 0.0, 0.5, lambda t: print('hi') or setattr(run_widget, "time", t))],
+                [time_slider := SliderWidget(0, len(run.positions), 0.0, 0.5, lambda t: setattr(run_widget, "time", t))],
                 [speed_slider := SliderWidget(-10, 10, 1.0, 0.1, lambda s: setattr(run_widget, "speed", s))],
             ),
         Vector2(0.5, 0.5),
@@ -463,6 +463,47 @@ def application(run: Run):
 pygame.font.init()
 pygame.init()
 
+def main():
+    parser = argparse.ArgumentParser(prog="visualize")
+    subparsers = parser.add_subparsers(help="Action to perform", dest="action")
+
+    parser_run = subparsers.add_parser("run", help="Run the visualizer in interactive mode")
+    parser_run.add_argument("--map", type=Path, help="Path to the map file")
+    parser_run.add_argument("--results", type=Path, help="Path to the results file")
+    parser_run.add_argument("--run-id", type=int, help="ID of the run to visualize", default=0)
+
+    parser_video = subparsers.add_parser("video", help="Generate a video of the run")
+    parser_video.add_argument("--map", type=Path, help="Path to the map file")
+    parser_video.add_argument("--results", type=Path, help="Path to the results file")
+    parser_video.add_argument("--run-id", type=int, help="ID of the run to visualize", default=0)
+    parser_video.add_argument("--output", type=Path, help="Path to the output video file", default="output.mp4")
+    parser_video.add_argument("--duration", type=float, help="Duration of the resulting video", default=20.0)
+    parser_video.add_argument("--fps", type=int, help="Frames per second", default=30)
+
+    if len(sys.argv) == 1:
+        DATA_DIRECTORY = Path("DCC_test")
+        RUN_NAME = "32x32size_96agents_0.2density_30.pth"
+        RUN_ID = 0
+
+        TEST_DIRECTORY = DATA_DIRECTORY / "test_set"
+        RESULT_DIRECTORY = DATA_DIRECTORY / "results_v2"
+
+        run = load_run(TEST_DIRECTORY / RUN_NAME, RESULT_DIRECTORY / RUN_NAME, RUN_ID)
+        application(run)
+
+        parser.print_help()
+    else:
+        args = parser.parse_args()
+        print(args)
+        if args.action == "run":
+            run = load_run(args.map, args.results, args.run_id)
+            application(run)
+        elif args.action == "video":
+            run = load_run(args.map, args.results, args.run_id)
+            make_video(run, args.output, args.duration, args.fps)
+        else:
+            parser.print_help()
+
+
 if __name__ == "__main__":
-    # application(run)
-    make_video(run, Path("test.mp4"), 40.0, 24)
+    main()
