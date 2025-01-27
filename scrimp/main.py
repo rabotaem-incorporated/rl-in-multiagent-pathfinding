@@ -88,6 +88,10 @@ class Agents:
         self.model.load_state_dict(checkpoint["model"])
         self.optim.load_state_dict(checkpoint["optim"])
 
+    def load_raw(self, path):
+        checkpoint = torch.load(path, weights_only=True)
+        self.model.load_state_dict(checkpoint)
+
     @torch.no_grad()
     def act(self, env: Environment):
         env = copy.deepcopy(env)
@@ -108,8 +112,11 @@ class Agents:
         goal_info[:, 4] = self.last_extrinsic_reward
         goal_info[:, 5] = torch.tensor([self.query_episodic_buffer(i, *env.agent_positions[i]) for i in range(num_agents)])
         goal_info[:, 6] = self.last_action
+        print(obs)
+        print(goal_info)
 
         out: ScrimpNetOutputs = self.model(obs, goal_info, self.state, self.message)
+        print(F.softmax(out.policy_logits, dim=1))
         rewards = np.zeros(num_agents)
 
         while True:
@@ -343,28 +350,30 @@ class Agents:
 
 if __name__ == "__main__":
     agents = Agents()
-    if Path("scrimp.pth").exists():
-        agents.load("scrimp.pth")
-
-    for i in tqdm.tqdm(range(0)):
-        agents.train_imitation_epoch()
-        if (i + 1) % 100 == 0:
-            agents.save("scrimp.pth")
+    agents.load_raw("scrimp/final/checkpoint.pkl")
 
     # env = Environment.generate(EnvironmentParams(
     #     size=10,
     #     num_agents=8,
     #     obstacle_prob=0.2,
     # ))
+    # env = Environment(np.array([
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    # ]), [(0, 4), (0, 0), (2, 2)], [(4, 0), (4, 4), (2, 2)])
     env = Environment(np.array([
-        [0, 0, 0, 1, 0],
-        [0, 1, 0, 1, 0],
         [0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 0],
-        [0, 1, 0, 0, 0],
-    ]), [(0, 4), (0, 0), (2, 2)], [(4, 0), (4, 4), (2, 2)])
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ]), [(2, 0)], [(2, 3)])
 
-    while True:
+    print(env)
+    for i in range(10):
         agents.reset(env.num_agents)
         env = agents.act(env)
         print(env)

@@ -16,6 +16,8 @@ class ArchitectureParameters:
     transformer_ff_dim: int = 1024
     transformer_num_layers: int = 1
     transformer_num_heads: int = 8
+    transformer_vdim: int = 32
+    transformer_kdim: int = 32
 
     output_hidden_dim: int = 512
 

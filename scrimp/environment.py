@@ -121,20 +121,28 @@ class Environment:
             goal_dist = self.distances_from(goal_x, goal_y)
             goal_dist = np.pad(goal_dist, (0, 1), constant_values=A_LOT)
 
-            for dx in range(-AP.fov // 2, AP.fov // 2):
-                for dy in range(-AP.fov // 2, AP.fov // 2):
+            agents_in_fov = []
+            for dx in range(-(AP.fov // 2), AP.fov // 2 + 1):
+                for dy in range(-(AP.fov // 2), AP.fov // 2 + 1):
                     if 0 <= x + dx < self.size and 0 <= y + dy < self.size:
                         i, j = dx + AP.fov // 2, dy + AP.fov // 2
-                        obs[agent, 0, i, j] = self.obstacles[x + dx, y + dy]
+                        if a := agent_map[x + dx, y + dy] and agent != a - 1:
+                            agents_in_fov.append(a - 1)
+                        obs[agent, 0, i, j] = agent_map[x + dx, y + dy] > 0
                         obs[agent, 1, i, j] = goal_map[x + dx, y + dy] == agent + 1
-                        obs[agent, 2, i, j] = goal_map[x + dx, y + dy] > 0
-                        obs[agent, 3, i, j] = agent_map[x + dx, y + dy] > 0
-                        obs[agent, 4, i, j] = goal_dist[x + dx + 1, y + dy] < goal_dist[x + dx, y + dy]
-                        obs[agent, 5, i, j] = goal_dist[x + dx - 1, y + dy] < goal_dist[x + dx, y + dy]
-                        obs[agent, 6, i, j] = goal_dist[x + dx, y + dy + 1] < goal_dist[x + dx, y + dy]
-                        obs[agent, 7, i, j] = goal_dist[x + dx, y + dy - 1] < goal_dist[x + dx, y + dy]
+                        obs[agent, 3, i, j] = self.obstacles[x + dx, y + dy]
+                        obs[agent, 4, i, j] = goal_dist[x + dx - 1, y + dy] < goal_dist[x + dx, y + dy]
+                        obs[agent, 5, i, j] = goal_dist[x + dx + 1, y + dy] < goal_dist[x + dx, y + dy]
+                        obs[agent, 6, i, j] = goal_dist[x + dx, y + dy - 1] < goal_dist[x + dx, y + dy]
+                        obs[agent, 7, i, j] = goal_dist[x + dx, y + dy + 1] < goal_dist[x + dx, y + dy]
                     else:
-                        obs[agent, 0, dx + AP.fov // 2, dy + AP.fov // 2] = 1
+                        obs[agent, 3, dx + AP.fov // 2, dy + AP.fov // 2] = 1
+            for other_agent in agents_in_fov:
+                goal_x, goal_y = self.goal_positions[other_agent]
+                dx, dy = goal_x - x, goal_y - y
+                dx, dy = np.clip(dx, -(AP.fov // 2), AP.fov // 2), np.clip(dy, -(AP.fov // 2), AP.fov // 2)
+                i, j = dx + AP.fov // 2, dy + AP.fov // 2
+                obs[agent, 2, i, j] = 1
 
             goal_dist = ((goal_x - x) ** 2 + (goal_y - y) ** 2) ** 0.5
             goal_info[agent, 0] = (goal_x - x) / goal_dist if goal_dist > 0 else 0
@@ -167,19 +175,23 @@ class Environment:
                         times_blocking[i] += 1
         return times_blocking * HP.blocking_reward
 
-    def go(self, x, y, action):
+    def go_(self, x, y, action):
         if action == 0:
             nx, ny = x, y
         elif action == 1:
-            nx, ny = x + 1, y
-        elif action == 2:
-            nx, ny = x - 1, y
-        elif action == 3:
             nx, ny = x, y + 1
-        elif action == 4:
+        elif action == 2:
+            nx, ny = x + 1, y
+        elif action == 3:
             nx, ny = x, y - 1
+        elif action == 4:
+            nx, ny = x - 1, y
         else:
             raise ValueError('Invalid action')
+        return nx, ny
+
+    def go(self, x, y, action):
+        nx, ny = self.go_(x, y, action)
 
         if 0 <= nx < self.size and 0 <= ny < self.size and not self.obstacles[nx, ny]:
             return nx, ny, True
@@ -219,7 +231,7 @@ class Environment:
         for i in range(self.num_agents):
             for x in range(self.size):
                 for y in range(self.size):
-                    for action in range(1, 5):
+                    for action in range(0, 4):
                         nx, ny, ok = self.go(x, y, action)
                         if ok:
                             for j in range(i):

@@ -803,7 +803,20 @@ class MAPFEnv(gym.Env):
                 # ensure new goal does not at the same grid of old goals or obstacles
                 goals[x, y] = goal_counter
                 goal_counter += 1
-        self.world = State(world, goals, self.num_agents)
+        # self.world = State(world, goals, self.num_agents)
+        self.world = State(np.array([
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ]), np.array([
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ]), 1)
 
     def observe(self, agent_id):
         """return one agent's observation"""

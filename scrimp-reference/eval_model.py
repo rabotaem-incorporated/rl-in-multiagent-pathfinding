@@ -98,10 +98,10 @@ if __name__ == "__main__":
                resume='allow')
     print('id is:{}'.format(wandb_id))
     print('Launching wandb...\n')
-    save_gif = True
+    save_gif = False
 
     # start evaluation
-    for k in CASE:
+    for k in [(1, 5, 0.0)]:
         # remember to modify the corresponding code (size,prob) in the 'mapf_gym.py'
         env = MAPFEnv(num_agents=k[0], size=k[1], prob=k[2])
         episodic_buffer = EpisodicBuffer(2e6, k[0])

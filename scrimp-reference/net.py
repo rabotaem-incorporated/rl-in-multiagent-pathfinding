@@ -82,6 +82,7 @@ class SCRIMPNet(nn.Module):
     @autocast()
     def forward(self, obs, vector, input_state, message):
         """run neural network"""
+        print(obs[0][0], vector[0][0], input_state[0][0], message[0][0], sep="\n\n")
         num_agent = obs.shape[1]
         obs = torch.reshape(obs, (-1,  NetParameters.NUM_CHANNEL, EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE))
         vector = torch.reshape(vector, (-1, NetParameters.VECTOR_LEN))
