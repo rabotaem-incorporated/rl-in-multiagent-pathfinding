@@ -2,7 +2,7 @@ import sys
 import os
 
 sys.path.append(os.getcwd())
-from test_visualizer.animate import animate
+# from test_visualizer.animate import animate
 import DCC_implementation.config as config
 from DCC_implementation.model import Network
 from DCC_implementation.environment import Environment
@@ -11,6 +11,7 @@ import torch
 import numpy as np
 import pickle
 import random
+import functools
 
 torch.manual_seed(config.test_seed)
 np.random.seed(config.test_seed)
@@ -56,7 +57,7 @@ def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
     return name
 
 
-def run_single_test(test):
+def run_single_test(test, original = False):
     mp, agents_xy, targets_xy, network = test
     env = Environment(from_map=True, mp=mp, agents_pos=agents_xy, goals_pos=targets_xy)
     network.reset()
@@ -73,7 +74,7 @@ def run_single_test(test):
             torch.as_tensor(last_act.astype(np.float32)).to(DEVICE),
             torch.as_tensor(pos.astype(int)),
         )
-        (obs, last_act, pos), _, done, _ = env.step(actions)
+        (obs, last_act, pos), _, done, _ = env.step_orig(actions) if original else env.step(actions)
         step += 1
         hist.append(env.agents_pos)
         comm_hist.append(comm_mask)
@@ -82,9 +83,9 @@ def run_single_test(test):
     return np.all(env.agents_pos == env.goals_pos), step, num_comm, hist, comm_hist
 
 
-def run_multiple_tests(tests):
+def run_multiple_tests(tests, original = False):
     pool = mp.Pool(mp.cpu_count() // 2)
-    ret = pool.map(run_single_test, tests)
+    ret = pool.starmap(run_single_test, zip(tests, [original] * len(tests)))
 
     success, steps, num_comm, hist, comm_hist = zip(*ret)
 
@@ -95,14 +96,14 @@ def run_multiple_tests(tests):
     return success, steps, num_comm, hist, comm_hist
 
 
-def run_tests_from_file(path, network):
+def run_tests_from_file(path, network, original = False):
     print(f"Running tests from {path}")
     with open(path, "rb") as f:
         tests = pickle.load(f)
     tests = [(*test, network) for test in tests]
     if path.split("_")[-1] == "1.pth":
         return run_single_test_and_animate(tests[0], "./DCC_test/animations/animation.svg")
-    return run_multiple_tests(tests)
+    return run_multiple_tests(tests, original)
 
 
 def run_single_test_and_animate(test, save_path):
@@ -165,7 +166,11 @@ def prepare():
 
 if __name__ == "__main__":
     network = prepare()
-    res = run_tests_from_file('/home/justermak/study/rl-in-multiagent-pathfinding/DCC_test/test_set/32x32size_32agents_0.3density_30.pth', network)
+    # res = run_tests_from_file('/home/justermak/study/rl-in-multiagent-pathfinding/DCC_test/test_set/32x32size_32agents_0.3density_30.pth', network)
+    for filename in os.listdir("./DCC_test/test_set"):
+        if filename.endswith("30.pth"):
+            results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network, original=True)
+            pickle.dump(results, open(f"./DCC_test/results/{filename}", "wb"))
     # for filename in os.listdir("./DCC_test/test_set"):
     #     if filename.endswith("30.pth"):
     #         results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network)
@@ -174,4 +179,3 @@ if __name__ == "__main__":
     #     for agents in (16, 32, 64, 96):
     #         for density in (0.2, 0.3, 0.4):
     #             create_multiple_tests(map_size, map_size, agents, density, 30)
-                

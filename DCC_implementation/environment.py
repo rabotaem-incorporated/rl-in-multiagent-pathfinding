@@ -328,7 +328,7 @@ class Environment:
                     np.all(next_pos[agent_id] == self.agents_pos, axis=1)
                 )[0]
 
-                if target_agent_id:
+                if len(target_agent_id) > 0:
 
                     target_agent_id = target_agent_id.item()
 
