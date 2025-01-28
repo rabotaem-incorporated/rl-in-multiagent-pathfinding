@@ -22,7 +22,7 @@ torch.set_num_threads(1)
 
 
 def create_single_test(map_x, map_y, num_agents, density):
-    name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_1.pth"
+    name = f"./tests/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_1.pth"
     env = Environment(
         obstacle_density=density, num_agents=num_agents, map_size=(map_x, map_y)
     )
@@ -40,7 +40,7 @@ def create_single_test(map_x, map_y, num_agents, density):
 def create_single_test_from_map(mp, agents_xy, targets_xy):
     map_x, map_y = mp.shape
     num_agents = agents_xy.shape[0]
-    name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_from_map_1.pth"
+    name = f"./tests/test_set/{map_x}x{map_y}size_{num_agents}agents_from_map_1.pth"
     with open(name, "wb") as f:
         pickle.dump([(mp, agents_xy, targets_xy)], f)
 
@@ -48,7 +48,7 @@ def create_single_test_from_map(mp, agents_xy, targets_xy):
 
 
 def create_multiple_tests(map_x, map_y, num_agents, density, n_cases):
-    name = f"./DCC_test/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_{n_cases}.pth"
+    name = f"./tests/test_set/{map_x}x{map_y}size_{num_agents}agents_{density}density_{n_cases}.pth"
     tests = []
     for i in range(n_cases):
         print(name, i)
@@ -110,7 +110,7 @@ def run_tests_from_file(path, network, original=False):
     tests = [(*test, network) for test in tests]
     if path.split("_")[-1] == "1.pth":
         return run_single_test_and_animate(
-            tests[0], f"./DCC_test/animations/{path.split('/')[-1].split('.')[0]}/animation.svg"
+            tests[0], f"./tests/animations/{path.split('/')[-1].split('.')[0]}/animation.svg"
         )
     return run_multiple_tests(tests, original)
 
@@ -182,17 +182,17 @@ def prepare():
 
 if __name__ == "__main__":
     network = prepare()
-    # res = run_tests_from_file('/home/justermak/study/rl-in-multiagent-pathfinding/DCC_test/test_set/32x32size_32agents_0.3density_30.pth', network)
-    # for filename in os.listdir("./DCC_test/test_set"):
+    # res = run_tests_from_file('/home/justermak/study/rl-in-multiagent-pathfinding/tests/test_set/32x32size_32agents_0.3density_30.pth', network)
+    # for filename in os.listdir("./tests/test_set"):
     #     if filename.endswith("30.pth"):
-    #         results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network, original=True)
-    #         pickle.dump(results, open(f"./DCC_test/results/{filename}", "wb"))
-    for filename in os.listdir("./DCC_test/test_set"):
+    #         results = run_tests_from_file(f"./tests/test_set/{filename}", network, original=True)
+    #         pickle.dump(results, open(f"./tests/results/{filename}", "wb"))
+    for filename in os.listdir("./tests/test_set"):
         if re.search(r'from_map', filename) is not None:
-            results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network, original=False)
-            pickle.dump(results, open(f"./DCC_test/results_v2/{filename}", "wb"))
-            results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network, original=True)
-            pickle.dump(results, open(f"./DCC_test/results/{filename}", "wb"))
+            results = run_tests_from_file(f"./tests/test_set/{filename}", network, original=False)
+            pickle.dump(results, open(f"./tests/results_v2/{filename}", "wb"))
+            results = run_tests_from_file(f"./tests/test_set/{filename}", network, original=True)
+            pickle.dump(results, open(f"./tests/results/{filename}", "wb"))
     # for map_size in (32, 64, 96):
     #     for agents in (16, 32, 64, 96):
     #         for density in (0.2, 0.3, 0.4):
@@ -255,7 +255,7 @@ if __name__ == "__main__":
 
     # for (x, y, z) in zip(maps, axys, txys):
     #     create_single_test_from_map(x, y, z)
-    # for filename in os.listdir("./DCC_test/test_set"):
+    # for filename in os.listdir("./tests/test_set"):
     #     if re.search(r'from_map', filename) is not None:
-    #         results = run_tests_from_file(f"./DCC_test/test_set/{filename}", network)
-    #         pickle.dump(results, open(f"./DCC_test/results_v2/{filename}", "wb"))
+    #         results = run_tests_from_file(f"./tests/test_set/{filename}", network)
+    #         pickle.dump(results, open(f"./tests/results_v2/{filename}", "wb"))

@@ -6,9 +6,12 @@ converting everything that can be immutable into an immutable structure
 
 Intended to support both mstar and rMstar."""
 
+import os
+import sys
+
+sys.path.append(os.getcwd() + '/scrimp_reference')
 
 from od_mstar3 import workspace_graph
-import sys
 import time as timer  # So that we can use the time command in ipython
 from od_mstar3 import SortedCollection
 from od_mstar3.col_set_addition import add_col_set_recursive, add_col_set
@@ -1258,3 +1261,5 @@ def find_path_limited_graph(obs_map, init_pos, goals, recursive=True,
     if return_memory:
         return path, num_nodes, corrected_mem
     return path
+
+
