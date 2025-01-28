@@ -56,7 +56,7 @@ def load_run(map_path, result_path, run_id: int) -> Run:
 
 @dataclasses.dataclass
 class Config:
-    TILE_SIZE = 16
+    TILE_SIZE = 28
     BORDER_WIDTH = 1
     COMM_ARC_ANGLE = math.radians(30)
     FONT_NAME = None
@@ -115,6 +115,7 @@ class RunWidget(Widget):
         self.paused = True
         self.time = 0.0
         self.speed = 1.0
+        self.attention_layer = 0
 
     def draw(self, rc: RenderingContext) -> None:
         if not self.paused:
@@ -150,8 +151,13 @@ class RunWidget(Widget):
             pos = pos1 * (1 - t) + pos2 * t
             attention = attention2
         if len(attention.shape) == 3:
-            attention = attention[0]
+            if self.attention_layer != 8:
+                attention = attention[self.attention_layer]
+            else:
+                attention = attention.mean(axis=0)
         attention = ((attention + attention.T) / 2) ** 0.4
+        attention[attention < 0.3] = 0.0
+
         for i in range(self.run.num_agents):
             color = cv2.cvtColor(np.uint8([[[256 / self.run.num_agents * i, 255, 255]]]), cv2.COLOR_HSV2RGB)[0, 0]
             draw.circle(
@@ -351,8 +357,9 @@ class SliderWidget(Widget):
             self.action(rounded)
 
 
-def get_frame(run: Run, time):
+def get_frame(run: Run, time, attention: int = 0):
     root = (run_widget := RunWidget(run))
+    run_widget.attention_layer = attention
 
     run_widget.time = time
 
@@ -426,6 +433,41 @@ def application(run: Run):
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     mouse_down = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    run_widget.attention_layer = 0
+                if event.key == pygame.K_2:
+                    run_widget.attention_layer = 1
+                if event.key == pygame.K_3:
+                    run_widget.attention_layer = 2
+                if event.key == pygame.K_4:
+                    run_widget.attention_layer = 3
+                if event.key == pygame.K_5:
+                    run_widget.attention_layer = 4
+                if event.key == pygame.K_6:
+                    run_widget.attention_layer = 5
+                if event.key == pygame.K_7:
+                    run_widget.attention_layer = 6
+                if event.key == pygame.K_8:
+                    run_widget.attention_layer = 7
+                if event.key == pygame.K_9:
+                    run_widget.attention_layer = 8
+                if event.key == ord('s'):
+                    images = []
+                    for i in range(9):
+                        raw_frame, size = get_frame(run, run_widget.time, i)
+                        img_array = np.frombuffer(raw_frame, dtype=np.uint8).reshape(int(size[1]), int(size[0]), 3)[:, :, ::-1]
+                        images.append(img_array)
+                    h, w = images[0].shape[:2]
+                    w //= 2
+                    h //= 2
+                    result = np.empty((h * 2, w * 6, 3), dtype=np.uint8)
+                    for i in range(4):
+                        result[0:h, i * w:(i + 1) * w] = cv2.resize(images[i], (h, w))
+                    for i in range(4):
+                        result[h:h * 2, i * w:(i + 1) * w] = cv2.resize(images[i + 4], (h, w))
+                    result[0:h * 2, w * 4:w * 6] = images[8]
+                    cv2.imwrite("attention.png", result)
 
         root.recompute_min_size()
         minsize = root.minsize
@@ -486,8 +528,8 @@ def main():
     if len(sys.argv) == 1:
         RUN_ID = 1
         run = load_run(
-            Path("DCC_test/test_set/32x32size_32agents_0.3density_30.pth"),
-            Path("scrimp_test/results/32x32size_32agents_0.3density_30.pth"),
+            Path("tests/test_set/32x32size_32agents_0.3density_30.pth"),
+            Path("DCC_test/results/32x32size_32agents_0.3density_30.pth"),
             RUN_ID)
         application(run)
 

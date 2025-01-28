@@ -98,11 +98,11 @@ def prepare():
 
 if __name__ == "__main__":
     agents = prepare()
-    for filename in tqdm.tqdm(sorted(os.listdir("./DCC_test/test_set"))[::]):
+    for filename in tqdm.tqdm(sorted(os.listdir("./tests/test_set"))[::]):
         if filename.endswith("30.pth"):
             if Path(f"./scrimp_test/results/{filename}").exists():
                 continue
-            results = run_tests_from_file(f"./DCC_test/test_set/{filename}", agents)
+            results = run_tests_from_file(f"./tests/test_set/{filename}", agents)
             results: list[TestResult]
             with open(f"./scrimp_test/results/{filename}", "wb") as f:
                 pickle.dump((
