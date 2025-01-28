@@ -46,9 +46,9 @@ def evaluate(eval_env, model0, device, episodic_buffer0, num_agent, save_gif0):
     if save_gif0:
         episode_frames.append(eval_env._render(mode='rgb_array', screen_width=900, screen_height=900))
 
-    while not done:
+    for i in range(5):
         actions, hidden_state, v_all, ps, message = model0.final_evaluate(obs, vector, hidden_state, message, num_agent,
-                                                                          greedy=False)
+                                                                          greedy=True)
 
         rewards, obs, vector, done, one_episode_perf, max_on_goals, on_goal = one_step(eval_env, actions, model0, v_all,
                                                                                        hidden_state, ps,

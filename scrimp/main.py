@@ -118,13 +118,13 @@ class Agents:
         self.state = out.state
         rewards = np.zeros(num_agents)
 
-        while True:
+        for i in range(512):
             mask = np.zeros((num_agents, 5), dtype=bool)
 
             def resample():
                 logits = out.policy_logits
                 logits[mask] = -torch.inf
-                action_dist = torch.distributions.Categorical(logits=logits)
+                action_dist = torch.distributions.Categorical(logits=logits / AP.temperature)
                 return action_dist.sample().cpu().numpy()
 
             action = resample()
@@ -230,6 +230,8 @@ class Agents:
                     continue
 
             break
+        else:
+            return None
 
         action = env.fix_actions(action, locked)
         assert action is not None
@@ -377,6 +379,6 @@ if __name__ == "__main__":
     for i in range(5):
         env = agents.act(env)
         print(env)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
     # actions, success = agents.pathfind(env, step_limit=10)

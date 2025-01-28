@@ -329,7 +329,7 @@ class SCRIMPNet(nn.Module):
 def main():
     model1 = SCRIMPNet()
     model2 = ScrimpNet()
-    model1.load_state_dict(torch.load("scrimp-reference/final/net_checkpoint.pkl")['model'])
+    model1.load_state_dict(torch.load(sys.argv[1])['model'])
 
     NUM_AGENT = 8
     test_input_obs = torch.randn(NUM_AGENT, AP.num_observation_in_dim, AP.fov, AP.fov)
@@ -404,7 +404,7 @@ def main():
         out2 = model2(test_input_obs, test_input_vector, test_input_state, test_input_message[0])
         assert torch.allclose(out1["policy_layer"].reshape(out2.policy_logits.shape), out2.policy_logits, atol=1e-3)
 
-    torch.save(model2.state_dict(), sys.argv[1])
+    torch.save(model2.state_dict(), sys.argv[2])
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ class ArchitectureParameters:
     num_actions: int = 5
 
     episodic_buffer_size: int = 80
+    temperature: float = 0.7
 
 
 @dataclasses.dataclass
@@ -50,4 +51,4 @@ class Hyperparameters:
 
 AP = ArchitectureParameters()
 HP = Hyperparameters()
-DEV = "cuda" if torch.cuda.is_available() else "cpu"
+DEV = "cuda"

@@ -55,6 +55,8 @@ def run_single_test(test: Test) -> TestResult:
     for i in range(MAX_EPISODE_LENGTH):
         print(i)
         env = agents.act(env)
+        if env is None:
+            break
         num_comms += env.num_agents ** 2
         attentions.append(agents.model.communication_block.encoder.saved_attention[0][0])
         agent_positions.append(np.array(env.agent_positions))
@@ -73,7 +75,7 @@ def run_single_test(test: Test) -> TestResult:
 
 def run_multiple_tests(tests):
     if PARALLEL:
-        pool = mp.Pool(16)
+        pool = mp.Pool(8)
         return pool.map(run_single_test, tests)
     else:
         return [run_single_test(test) for test in tests]
@@ -96,8 +98,10 @@ def prepare():
 
 if __name__ == "__main__":
     agents = prepare()
-    for filename in tqdm.tqdm(sorted(os.listdir("./DCC_test/test_set"))[:2:]):
+    for filename in tqdm.tqdm(sorted(os.listdir("./DCC_test/test_set"))[::]):
         if filename.endswith("30.pth"):
+            if Path(f"./scrimp_test/results/{filename}").exists():
+                continue
             results = run_tests_from_file(f"./DCC_test/test_set/{filename}", agents)
             results: list[TestResult]
             with open(f"./scrimp_test/results/{filename}", "wb") as f:

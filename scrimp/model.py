@@ -308,7 +308,7 @@ class OutputHeads(nn.Module):
         policy_logits = self.policy_fc(observation)
         extrinsic_value = self.extrinsic_value_fc(observation)
         intrinsic_value = self.intrinsic_value_fc(observation)
-        blocking = self.blocking_fc(observation)
+        blocking = F.sigmoid(self.blocking_fc(observation))
         message = self.message_fc(observation)
 
         return policy_logits, extrinsic_value, intrinsic_value, blocking, message

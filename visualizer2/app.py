@@ -484,11 +484,10 @@ def main():
     parser_video.add_argument("--fps", type=int, help="Frames per second", default=30)
 
     if len(sys.argv) == 1:
-
-        RUN_ID = 0
+        RUN_ID = 1
         run = load_run(
-            Path("DCC_test/test_set/32x32size_16agents_0.2density_30.pth"),
-            Path("scrimp_test/results/32x32size_16agents_0.2density_30.pth"),
+            Path("DCC_test/test_set/32x32size_32agents_0.3density_30.pth"),
+            Path("scrimp_test/results/32x32size_32agents_0.3density_30.pth"),
             RUN_ID)
         application(run)
 
