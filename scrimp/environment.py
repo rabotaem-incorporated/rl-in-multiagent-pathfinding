@@ -121,13 +121,19 @@ class Environment:
             goal_dist = self.distances_from(goal_x, goal_y)
             goal_dist = np.pad(goal_dist, (0, 1), constant_values=A_LOT)
 
+            dist = ((goal_x - x) ** 2 + (goal_y - y) ** 2) ** 0.5
+            goal_info[agent, 0] = (goal_x - x) / dist if dist > 0 else 0
+            goal_info[agent, 1] = (goal_y - y) / dist if dist > 0 else 0
+            goal_info[agent, 2] = dist
+
             agents_in_fov = []
             for dx in range(-(AP.fov // 2), AP.fov // 2 + 1):
                 for dy in range(-(AP.fov // 2), AP.fov // 2 + 1):
                     if 0 <= x + dx < self.size and 0 <= y + dy < self.size:
                         i, j = dx + AP.fov // 2, dy + AP.fov // 2
-                        if a := agent_map[x + dx, y + dy] and agent != a - 1:
-                            agents_in_fov.append(a - 1)
+                        if a := agent_map[x + dx, y + dy]:
+                            if agent != a - 1:
+                                agents_in_fov.append(a - 1)
                         obs[agent, 0, i, j] = agent_map[x + dx, y + dy] > 0
                         obs[agent, 1, i, j] = goal_map[x + dx, y + dy] == agent + 1
                         obs[agent, 3, i, j] = self.obstacles[x + dx, y + dy]
@@ -143,11 +149,6 @@ class Environment:
                 dx, dy = np.clip(dx, -(AP.fov // 2), AP.fov // 2), np.clip(dy, -(AP.fov // 2), AP.fov // 2)
                 i, j = dx + AP.fov // 2, dy + AP.fov // 2
                 obs[agent, 2, i, j] = 1
-
-            goal_dist = ((goal_x - x) ** 2 + (goal_y - y) ** 2) ** 0.5
-            goal_info[agent, 0] = (goal_x - x) / goal_dist if goal_dist > 0 else 0
-            goal_info[agent, 1] = (goal_y - y) / goal_dist if goal_dist > 0 else 0
-            goal_info[agent, 2] = goal_dist
 
         return obs, goal_info
 
@@ -200,54 +201,65 @@ class Environment:
 
 
     def fix_actions(self, actions: np.ndarray, locked: np.ndarray) -> np.ndarray | None:
-        v = (np.arange(1, self.num_agents * self.size * self.size * 2 + 1, dtype=object)
-             .reshape((self.num_agents, self.size, self.size, 2)))
+        def v(i, a):
+            return int(i * 5 + a + 1)
+
         cnf = []
+
+        # two agents can't arrive at the same cell
         for i in range(self.num_agents):
-            for x in range(self.size):
-                for y in range(self.size):
-                    for t in range(2):
-                        if self.obstacles[x, y]:
-                            cnf.append([-v[i, x, y, 0]])
-                            cnf.append([-v[i, x, y, 1]])
-                        else:
-                            for j in range(i):
-                                cnf.append([-v[i, x, y, t], -v[j, x, y, t]])
-        for i in range(self.num_agents):
-            cnf.append([v[i, self.agent_positions[i][0], self.agent_positions[i][1], 0]])
-            if locked[i]:
-                nx, ny, ok = self.go(self.agent_positions[i][0], self.agent_positions[i][1], actions[i])
+            for a1 in range(5):
+                nx1, ny1, ok = self.go(self.agent_positions[i][0], self.agent_positions[i][1], a1)
                 if not ok:
-                    return None
-                cnf.append([v[i, nx, ny, 1]])
-            else:
-                clause = []
-                for action in range(5):
-                    nx, ny, ok = self.go(self.agent_positions[i][0], self.agent_positions[i][1], action)
-                    if ok:
-                        clause.append(v[i, nx, ny, 1])
-                cnf.append(clause)
+                    continue
+                for j in range(i):
+                    for a2 in range(5):
+                        nx2, ny2, ok = self.go(self.agent_positions[j][0], self.agent_positions[j][1], a2)
+                        if not ok:
+                            continue
+                        if nx1 == nx2 and ny1 == ny2:
+                            cnf.append([-v(i, a1), -v(j, a2)])
 
         for i in range(self.num_agents):
-            for x in range(self.size):
-                for y in range(self.size):
-                    for action in range(0, 4):
-                        nx, ny, ok = self.go(x, y, action)
-                        if ok:
-                            for j in range(i):
-                                cnf.append([-v[i, x, y, 0], -v[i, nx, ny, 1], -v[j, nx, ny, 0], -v[j, x, y, 1]])
+            if locked[i]:
+                cnf.append([v(i, actions[i])])
+
+        # each agent must move
+        for i in range(self.num_agents):
+            if locked[i]:
+                cnf.append([v(i, actions[i])])
+            else:
+                clause = []
+                for a in range(5):
+                    nx, ny, ok = self.go(self.agent_positions[i][0], self.agent_positions[i][1], a)
+                    if ok:
+                        clause.append(v(i, a))
+                cnf.append(clause)
+
+        # two agents can't swap
+        for i in range(self.num_agents):
+            for j in range(i):
+                x1, y1 = self.agent_positions[i]
+                x2, y2 = self.agent_positions[j]
+                if abs(x1 - x2) + abs(y1 - y2) == 1:
+                    for a1 in range(5):
+                        for a2 in range(5):
+                            nx1, ny1, ok1 = self.go(x1, y1, a1)
+                            nx2, ny2, ok2 = self.go(x2, y2, a2)
+                            if ok1 and ok2 and nx1 == x2 and ny1 == y2 and nx2 == x1 and ny2 == y1:
+                                cnf.append([-v(i, a1), -v(j, a2)])
 
         # print(cnf)
         solution = pycosat.solve(cnf)
         if solution == 'UNSAT':
             return None
+        solution = set(solution)
 
         result = np.full(self.num_agents, -1, dtype=int)
         for i in range(self.num_agents):
-            for action in range(5):
-                nx, ny, ok = self.go(self.agent_positions[i][0], self.agent_positions[i][1], action)
-                if ok and v[i, nx, ny, 1] in solution:
-                    result[i] = action
+            for a in range(5):
+                if v(i, a) in solution:
+                    result[i] = a
                     break
 
         return result

@@ -101,7 +101,7 @@ if __name__ == "__main__":
     save_gif = False
 
     # start evaluation
-    for k in [(1, 5, 0.0)]:
+    for k in [(2, 5, 0.0)]:
         # remember to modify the corresponding code (size,prob) in the 'mapf_gym.py'
         env = MAPFEnv(num_agents=k[0], size=k[1], prob=k[2])
         episodic_buffer = EpisodicBuffer(2e6, k[0])
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         all_perf_dict_std = {'episode_len': [], 'max_goals': [], 'collide': []}
         print('agent: {}, world: {}, obstacle: {}'.format(k[0], k[1], k[2]))
 
-        for j in range(NUM_TIMES):
+        for j in range(1):
             eval_performance_dict = evaluate(env, model, torch.device('cpu'), episodic_buffer, k[0], save_gif)
             save_gif = False  # here we only record gif once
             if j % 20 == 0:

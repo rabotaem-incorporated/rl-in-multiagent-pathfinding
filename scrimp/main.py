@@ -30,8 +30,8 @@ class Experiences:
 
 
 class Agents:
-    def __init__(self):
-        self.model = ScrimpNet().to(DEV)
+    def __init__(self, save_attention: bool = False):
+        self.model = ScrimpNet(save_attention).to(DEV)
         self.num_agents = None
         self.last_action = None
         self.state = None
@@ -108,15 +108,14 @@ class Agents:
                 self.write_to_episodic_buffer(i, *env.agent_positions[i])
 
         goal_info[:, :3] = torch.tensor(observed_goal_info)
-        goal_info[:, 3] = self.last_intrinsic_reward
-        goal_info[:, 4] = self.last_extrinsic_reward
+        goal_info[:, 3] = self.last_extrinsic_reward
+        goal_info[:, 4] = self.last_intrinsic_reward
         goal_info[:, 5] = torch.tensor([self.query_episodic_buffer(i, *env.agent_positions[i]) for i in range(num_agents)])
         goal_info[:, 6] = self.last_action
-        print(obs)
-        print(goal_info)
 
         out: ScrimpNetOutputs = self.model(obs, goal_info, self.state, self.message)
-        print(F.softmax(out.policy_logits, dim=1))
+        self.message = out.messages
+        self.state = out.state
         rewards = np.zeros(num_agents)
 
         while True:
@@ -144,10 +143,6 @@ class Agents:
                 if all_ok:
                     break
                 action = resample()
-
-            fixed = env.fix_actions(action, locked)
-            if fixed is None:
-                continue
 
             agents_map = np.full((env.size, env.size), object, dtype=object)
             for x in range(env.size):
@@ -202,8 +197,8 @@ class Agents:
                             obs = torch.tensor(obs, device=DEV, dtype=torch.float32)
                             goal_info = torch.zeros((num_agents, AP.goal_in_dim), device=DEV)
                             goal_info[:, :3] = torch.tensor(observed_goal_info)
-                            goal_info[:, 3] = torch.zeros(num_agents)
-                            goal_info[:, 4] = torch.tensor(rewards)
+                            goal_info[:, 3] = torch.tensor(rewards)
+                            goal_info[:, 4] = torch.zeros(num_agents)
                             goal_info[:, 5] = torch.tensor(
                                 [self.query_episodic_buffer(i, *temp_env.agent_positions[i]) for i in range(num_agents)]
                             )
@@ -240,6 +235,7 @@ class Agents:
         assert action is not None
         self.last_action = torch.tensor(action, device=DEV)
 
+        rewards = np.zeros(num_agents)
         for i in range(num_agents):
             if env.goal_positions[i] == env.agent_positions[i]:
                 if action[i]:
@@ -268,6 +264,10 @@ class Agents:
             intrinsic_rewards=intrinsic_rewards,
             blocking_rewards=torch.tensor(blocking_rewards, device=DEV),
         ))
+
+        self.last_intrinsic_reward = intrinsic_rewards
+        self.last_extrinsic_reward = torch.tensor(rewards, device=DEV)
+        self.last_action = torch.tensor(action, device=DEV)
 
         return resulting_env
 
@@ -317,8 +317,8 @@ class Agents:
                     self.write_to_episodic_buffer(i, *env.agent_positions[i])
 
             goal_info[:, :3] = torch.tensor(observed_goal_info)
-            goal_info[:, 3] = self.last_intrinsic_reward
-            goal_info[:, 4] = self.last_extrinsic_reward
+            goal_info[:, 3] = self.last_extrinsic_reward
+            goal_info[:, 4] = self.last_intrinsic_reward
             goal_info[:, 5] = torch.tensor([self.query_episodic_buffer(i, *env.agent_positions[i]) for i in range(num_agents)])
             goal_info[:, 6] = self.last_action
 
@@ -366,15 +366,15 @@ if __name__ == "__main__":
     # ]), [(0, 4), (0, 0), (2, 2)], [(4, 0), (4, 4), (2, 2)])
     env = Environment(np.array([
         [0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0],
         [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-    ]), [(2, 0)], [(2, 3)])
+    ]), [(2, 0), (3, 0)], [(2, 3), (3, 3)])
 
     print(env)
-    for i in range(10):
-        agents.reset(env.num_agents)
+    agents.reset(env.num_agents)
+    for i in range(5):
         env = agents.act(env)
         print(env)
         time.sleep(0.5)

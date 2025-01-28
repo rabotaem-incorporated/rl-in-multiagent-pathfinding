@@ -806,17 +806,17 @@ class MAPFEnv(gym.Env):
         # self.world = State(world, goals, self.num_agents)
         self.world = State(np.array([
             [0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-            [1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
+            [0, 0, -1, 0, 0],
+            [1, 0, -1, 0, 0],
+            [2, 0, -1, 0, 0],
             [0, 0, 0, 0, 0],
         ]), np.array([
             [0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0],
             [0, 0, 0, 1, 0],
+            [0, 0, 0, 2, 0],
             [0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-        ]), 1)
+        ]), 2)
 
     def observe(self, agent_id):
         """return one agent's observation"""

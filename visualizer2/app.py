@@ -44,12 +44,13 @@ def load_run(map_path, result_path, run_id: int) -> Run:
         attentions = np.array(data[4][run_id], dtype=np.float32)
         num_steps = len(positions)
         assert positions.shape == (num_steps, num_agents, 2)
-        assert attentions.shape == (num_steps, num_agents, num_agents)
+        # assert attentions.shape == (num_steps, num_agents, num_agents)
         assert np.all(attentions >= 0) and np.all(attentions <= 1)
         assert np.all(positions >= 0) and np.all(positions < map_.shape)
-        assert np.all(positions[-1] == goals)
+        # assert np.all(positions[-1] == goals)
     positions = np.concatenate([starts[None], positions], axis=0)
-    attentions = np.concatenate([np.zeros((1, num_agents, num_agents)), attentions], axis=0)
+    print(positions.shape)
+    attentions = np.concatenate([np.zeros((1, *attentions.shape[1:])), attentions], axis=0)
     return Run(map_, starts, goals, positions, attentions, num_agents, map_width, map_height)
 
 
@@ -148,7 +149,9 @@ class RunWidget(Widget):
             t = CONFIG.smooth((t - 0.5) * 2)
             pos = pos1 * (1 - t) + pos2 * t
             attention = attention2
-        attention = ((attention + attention.T) / 2) ** 0.1
+        if len(attention.shape) == 3:
+            attention = attention[0]
+        attention = ((attention + attention.T) / 2) ** 0.4
         for i in range(self.run.num_agents):
             color = cv2.cvtColor(np.uint8([[[256 / self.run.num_agents * i, 255, 255]]]), cv2.COLOR_HSV2RGB)[0, 0]
             draw.circle(
@@ -481,14 +484,12 @@ def main():
     parser_video.add_argument("--fps", type=int, help="Frames per second", default=30)
 
     if len(sys.argv) == 1:
-        DATA_DIRECTORY = Path("DCC_test")
-        RUN_NAME = "32x32size_96agents_0.2density_30.pth"
+
         RUN_ID = 0
-
-        TEST_DIRECTORY = DATA_DIRECTORY / "test_set"
-        RESULT_DIRECTORY = DATA_DIRECTORY / "results_v2"
-
-        run = load_run(TEST_DIRECTORY / RUN_NAME, RESULT_DIRECTORY / RUN_NAME, RUN_ID)
+        run = load_run(
+            Path("DCC_test/test_set/32x32size_16agents_0.2density_30.pth"),
+            Path("scrimp_test/results/32x32size_16agents_0.2density_30.pth"),
+            RUN_ID)
         application(run)
 
         parser.print_help()

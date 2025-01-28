@@ -82,7 +82,7 @@ class SCRIMPNet(nn.Module):
     @autocast()
     def forward(self, obs, vector, input_state, message):
         """run neural network"""
-        print(obs[0][0], vector[0][0], input_state[0][0], message[0][0], sep="\n\n")
+        print(obs, vector, message[:, :4], sep="\n\n", end="\n\n")
         num_agent = obs.shape[1]
         obs = torch.reshape(obs, (-1,  NetParameters.NUM_CHANNEL, EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE))
         vector = torch.reshape(vector, (-1, NetParameters.VECTOR_LEN))
@@ -121,5 +121,6 @@ class SCRIMPNet(nn.Module):
         value_ex = self.value_layer_ex(c1)
         blocking = torch.sigmoid(self.blocking_layer(c1))
         message = self.message_layer(c1)
+        print(value_in, value_ex, blocking, policy_layer, message[:, :4], sep="\n\n", end="\n\n")
         return policy, value_in, value_ex, blocking, policy_sig, output_state, policy_layer, message
 

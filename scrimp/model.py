@@ -235,25 +235,28 @@ class PositionalEncoding(nn.Module):
 class TransformerEncoder(nn.Module):
     """a sequence to sequence model with attention mechanism"""
 
-    def __init__(self, d_model, d_hidden, n_layers, n_head, d_k, d_v, n_position):
+    def __init__(self, d_model, d_hidden, n_layers, n_head, d_k, d_v, n_position, save_attention=False):
         """initialization"""
         super().__init__()
         self.encoder = Encoder(d_model=d_model, d_hidden=d_hidden,
                                n_layers=n_layers, n_head=n_head, d_k=d_k, d_v=d_v)
 
         self.position_enc = PositionalEncoding(d_model, n_position=n_position)
+        self.save_attention = save_attention
+        self.saved_attention = []
 
     def forward(self, encoder_input):
         """run encoder"""
         encoder_input = self.position_enc(encoder_input)
 
-        enc_output, *_ = self.encoder(encoder_input)
+        enc_output, attentions = self.encoder(encoder_input, return_attns=True)
+        self.saved_attention = np.array([a.detach().cpu().numpy() for a in attentions])
 
         return enc_output
 
 
 class CommunicationBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, save_attention=False):
         super().__init__()
 
         self.encoder = TransformerEncoder(
@@ -264,6 +267,7 @@ class CommunicationBlock(nn.Module):
             d_k=AP.transformer_kdim,
             d_v=AP.transformer_vdim,
             n_position=1024,
+            save_attention=save_attention,
         )
 
     def forward(self, message: torch.Tensor):
@@ -321,18 +325,20 @@ class ScrimpNetOutputs:
 
 
 class ScrimpNet(nn.Module):
-    def __init__(self):
+    def __init__(self, save_attention=False):
         super().__init__()
 
         self.observation_encoder = ObservationEncoder()
-        self.communication_block = CommunicationBlock()
+        self.communication_block = CommunicationBlock(save_attention)
         self.output_heads = OutputHeads()
 
     def forward(self, obs: torch.Tensor, goal_info: torch.Tensor, state: ScrimpNetState, message: torch.Tensor) -> ScrimpNetOutputs:
+        # print(obs, goal_info, message[:, :4], sep="\n\n", end="\n\n")
         obs, memory, state = self.observation_encoder(obs, goal_info, state)
         message = self.communication_block(message)
         policy, extrinsic_value, intrinsic_value, blocking, message = self.output_heads(obs, memory, message)
 
+        # print(intrinsic_value, extrinsic_value, blocking, policy, message[:, :4], sep="\n\n", end="\n\n")
         return ScrimpNetOutputs(
             policy_logits=policy,
             extrinsic_value=extrinsic_value,
