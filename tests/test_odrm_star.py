@@ -21,5 +21,5 @@ if __name__ == '__main__':
         if filename[1] == 'x' and filename.endswith('30.pth'):
             print(filename)
             data = pickle.load(open(f'./tests/test_set/{filename}', 'rb'))
-            a, b, c, d, e = zip(*map(run_one, data))
-            pickle.dump((a, b, c, d, e), open(f'./tests/results_odrm_star/{filename}', 'wb'))
+            res = zip(*map(run_one, data))
+            pickle.dump(res, open(f'./tests/results_odrm_star/{filename}', 'wb'))
