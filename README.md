@@ -28,4 +28,6 @@
 
 # Визуализация
 
-`visualizer2/app.py` представляет собой приложение для генерации видео с решениями MAPF задач. Использование: `python visualizer2/app.py video --map ... --results ... --run-id N`
+`visualizer2/app.py` представляет собой приложение для генерации видео с решениями MAPF задач. Использование: `python visualizer2/app.py video --map ... --results ... --run-id N`. Подробнее в `python visualizer2/app.py video --help`
+
+Также приложение можно использвать для интерактивной визуализации. Использование: `python visualizer2/app.py run --map ... --results ... --run-id N`. Подробнее в `python visualizer2/app.py run --help`
