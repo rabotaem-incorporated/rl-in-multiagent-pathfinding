@@ -149,6 +149,6 @@ if __name__ == "__main__":
     for filename in os.listdir("./tests/test_set"):
         if re.search(r'from_map', filename) is not None:
             results = run_tests_from_file(f"./tests/test_set/{filename}", network, original=False)
-            pickle.dump(results, open(f"./tests/results_v2/{filename}", "wb"))
+            pickle.dump([[e] for e in results], open(f"./tests/results_v2/{filename}", "wb"))
             results = run_tests_from_file(f"./tests/test_set/{filename}", network, original=True)
-            pickle.dump(results, open(f"./tests/results/{filename}", "wb"))
+            pickle.dump([[e] for e in results], open(f"./tests/results/{filename}", "wb"))
